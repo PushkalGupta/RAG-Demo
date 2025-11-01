@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RAG-Bot Demo (v8.0)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .chat-bubble-user {
+        background-color: #dbeafe; /* light blue */
+        color: #1e3a8a; /* dark blue */
+      }
+      .chat-bubble-bot {
+        background-color: #1e3a8a; /* dark blue */
+        color: #e0f2fe; /* light cyan */
+      }
+      .gradient-bg {
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+      }
+
+      /* Tab styles */
+      .tab-button {
+        padding: 10px 20px;
+        cursor: pointer;
+        border-bottom: 4px solid transparent;
+        color: #dbeafe; /* light blue text */
+        font-weight: 500;
+        position: relative;
+      }
+      .tab-button.active {
+        color: #ffffff; /* white */
+        font-weight: 700;
+        border-bottom-color: #3b82f6; /* blue-500 */
+      }
+      .tab-button:hover:not(.active) {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+      .tab-content {
+        display: none; /* Hidden by default */
+        height: 100%;
+      }
+      .tab-content.active {
+        display: flex; /* Use flex to allow content to fill height */
+        flex-direction: column;
+      }
+      #chat-tab {
+        flex-direction: column;
+      }
+
+      .notification-dot {
+        height: 10px;
+        width: 10px;
+        background-color: #ef4444; /* red-500 */
+        border-radius: 9999px;
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        border: 2px solid #1e3a8a;
+      }
+
+      /* Workflow styles */
+      .workflow-container {
+        padding: 1.5rem;
+        height: 100%;
+        overflow-y: auto;
+        color: #334155;
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+      .workflow-box {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-top: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+      .workflow-header {
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .workflow-header h4 {
+        font-family: "Inter", sans-serif;
+        font-weight: 700;
+        color: #1e3a8a;
+        font-size: 1.125rem;
+      }
+      .workflow-body {
+        padding: 1.25rem;
+        font-family: "Courier New", Courier, monospace;
+      }
+      .workflow-body pre {
+        background-color: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        padding: 1rem;
+        border-radius: 4px;
+        white-space: pre-wrap; /* Wrap long lines */
+        word-wrap: break-word; /* Break words */
+      }
+
+      /* KB Management styles */
+      .kb-management {
+        padding: 1.5rem;
+        height: 100%;
+        overflow-y: auto; /* Allow KB to scroll */
+      }
+      .kb-item {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+      }
+      .kb-item strong {
+        color: #1e3a8a;
+      }
+      #add-doc-form textarea,
+      #add-doc-form input {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        font-family: "Inter", sans-serif;
+      }
+      #add-doc-button {
+        background-color: #16a34a; /* Green */
+        color: white;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        font-weight: 600;
+        width: 100%;
+        cursor: pointer;
+      }
+      #add-doc-button:hover {
+        background-color: #15803d;
+      }
+
+      /* API Key UI */
+      #api-key-icon {
+        padding: 0.5rem; /* 8px */
+        border-radius: 9999px; /* rounded-full */
+        color: #9ca3af; /* gray-400 */
+        cursor: pointer;
+      }
+      #api-key-icon:hover {
+        color: #ffffff; /* white */
+        background-color: #1e3a8a; /* blue-800 */
+      }
+      #api-key-row {
+        padding: 12px 16px;
+        background-color: #fffbeb; /* Light yellow */
+        border-bottom: 1px solid #fde68a; /* Darker yellow */
+        gap: 8px;
+        align-items: center;
+        display: none; /* Hidden by default */
+      }
+      #api-key-row.active {
+        display: flex; /* Shown when active */
+      }
+      #api-key-row label {
+        font-weight: 600;
+        color: #b45309; /* Amber */
+      }
+      #api-key-row input {
+        flex: 1;
+        border: 1px solid #fde68a;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-family: "Courier New", Courier, monospace;
+      }
+      #api-key-save-button {
+        background-color: #2563eb; /* blue-600 */
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-weight: 500;
+      }
+      #api-key-save-button:hover {
+        background-color: #1d4ed8; /* blue-700 */
+      }
+
+      /* Toast Notification */
+      #toast-notification {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        color: white;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        z-index: 100;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s, visibility 0.3s;
+      }
+      #toast-notification.show {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      /* Demo Tab Styles */
+      .demo-scenario {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1.5rem;
+      }
+      .demo-scenario h4 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1e3a8a;
+      }
+      .demo-scenario p {
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        color: #475569;
+        line-height: 1.5;
+      }
+      .demo-button {
+        background-color: #6366f1; /* Indigo-500 */
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 1rem;
+        display: inline-block;
+        transition: background-color 0.2s;
+      }
+      .demo-button:hover {
+        background-color: #4f46e5; /* Indigo-600 */
+      }
+      .demo-button:disabled {
+        background-color: #a5b4fc; /* indigo-300 */
+        cursor: not-allowed;
+      }
+
+      /* New Demo Log styles */
+      #demo-log {
+        padding: 1rem;
+      }
+      #demo-log h5 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #334155; /* slate-700 */
+      }
+      #demo-log ul {
+        list-style-type: none;
+        padding-left: 0;
+        margin-top: 1rem;
+      }
+      #demo-log li {
+        position: relative;
+        padding-left: 2rem;
+        padding-bottom: 1.5rem;
+        border-left: 2px solid #e2e8f0; /* slate-200 */
+      }
+      #demo-log li:last-child {
+        border-left-color: transparent;
+        padding-bottom: 0;
+      }
+      #demo-log li::before {
+        content: "";
+        position: absolute;
+        left: -9px; /* (2/2) - 10 = -9 */
+        top: 4px;
+        width: 18px;
+        height: 18px;
+        border-radius: 9999px;
+        background-color: white;
+        border: 2px solid #cbd5e1; /* slate-300 */
+      }
+      #demo-log li.completed::before {
+        background-color: #22c55e; /* green-500 */
+        border-color: #16a34a; /* green-600 */
+      }
+      #demo-log li.active::before {
+        background-color: #3b82f6; /* blue-500 */
+        border-color: #2563eb; /* blue-600 */
+      }
+      #demo-log li p {
+        font-size: 0.9rem;
+        color: #475569; /* slate-600 */
+        margin-top: 0.25rem;
+      }
+    </style>
+  </head>
+  <body class="gradient-bg flex items-center justify-center min-h-screen">
+    <!-- Main Container -->
+    <div
+      class="bg-white w-full max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-4 rounded-lg shadow-2xl flex flex-col h-[90vh] max-h-[1000px]"
+    >
+      <!-- Header -->
+      <div class="bg-gray-100 p-4 rounded-t-lg border-b border-gray-200">
+        <h1
+          class="text-2xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-cyan-500"
+        >
+          RAG-Bot Demo
+        </h1>
+        <p class="text-center text-sm text-gray-600">
+          Pushkal Gupta & Bhavesh Panjwani
+        </p>
+      </div>
+
+      <!-- Tab Navigation -->
+      <nav class="bg-blue-900 flex justify-between items-center shadow-md px-4">
+        <!-- Centered Tab Buttons -->
+        <div class="flex justify-start flex-1">
+          <button class="tab-button active" onclick="showTab('chat')">
+            Chat
+          </button>
+          <button class="tab-button" onclick="showTab('kb')">
+            Knowledge Base
+          </button>
+          <button class="tab-button" onclick="showTab('workflow')">
+            RAG Workflow
+            <span id="workflow-dot" class="notification-dot hidden"></span>
+          </button>
+          <button class="tab-button" onclick="showTab('demo')">
+            Demo Scenarios
+          </button>
+        </div>
+
+        <!-- API Key Icon on the right -->
+        <button id="api-key-icon" class="transition-colors">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            class="w-6 h-6"
+          >
+            <path
+              d="M12.25 3.125a3.125 3.125 0 1 1 6.25 0 3.125 3.125 0 0 1-6.25 0ZM13.125 6.25a1.875 1.875 0 1 0 3.75 0 1.875 1.875 0 0 0-3.75 0Z"
+            />
+            <path
+              d="m.94 13.504 3.996-3.997a1.876 1.876 0 0 1 2.652 0l2.348 2.348a1.875 1.875 0 0 1 0 2.652L5.94 18.504a.75.75 0 0 1-1.06 0l-3.94-3.94a.75.75 0 0 1 0-1.06Z"
+            />
+            <path
+              d="m11.25 7.625-2.22 2.22a3.376 3.376 0 0 0-4.773 4.773l-1.06 1.06a.75.75 0 0 1-1.06-1.06l1.06-1.06a3.376 3.376 0 0 0 4.773-4.773l2.22-2.22a.75.75 0 1 1 1.06 1.06Z"
+            />
+          </svg>
+        </button>
+      </nav>
+
+      <!-- API Key Input Row (hidden by default) -->
+      <div id="api-key-row">
+        <label for="api-key-input">API Key:</label>
+        <input
+          type="password"
+          id="api-key-input"
+          placeholder="Paste your Google AI Studio API Key..."
+        />
+        <button id="api-key-save-button" type="button">Save Key</button>
+      </div>
+
+      <!-- Tab Content Panes -->
+      <div class="flex-1 overflow-y-auto bg-gray-50 relative">
+        <!-- Tab 1: Chat -->
+        <div id="chat-tab" class="tab-content active">
+          <!-- Chat Area -->
+          <div id="chat-area" class="flex-1 p-6 space-y-4 overflow-y-auto">
+            <!-- Initial Bot Message -->
+            <div class="flex justify-start">
+              <div class="chat-bubble-bot p-4 rounded-lg max-w-lg shadow">
+                <p class="font-semibold">RAG-Bot</p>
+                <p>
+                  Hello! I'm loaded with knowledge about IoT and Smart Cities.
+                </p>
+                <p class="mt-2">
+                  To see my real power, go to the
+                  <strong>'Demo Scenarios' tab</strong> and run the "Secret PIN"
+                  demo. It will guide you through teaching me a secret, and then
+                  you can ask me for it!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Input Area -->
+          <div class="p-4 bg-gray-100 border-t border-gray-200">
+            <div
+              id="retrieval-status"
+              class="hidden h-10 p-2 mb-2 rounded-md bg-yellow-100 text-yellow-800 text-sm border border-yellow-200"
+            >
+              <p><span class="font-bold">Retrieving context...</span></p>
+            </div>
+
+            <div class="flex space-x-3">
+              <input
+                type="text"
+                id="user-input"
+                class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                placeholder="Ask a question (e.g., 'What is my PIN?' after running the demo)"
+              />
+              <button
+                id="send-button"
+                class="bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow hover:bg-blue-800 transition duration-200 flex items-center justify-center"
+              >
+                Send
+              </button>
+            </div>
+            <div
+              id="loading-indicator"
+              class="hidden text-center text-gray-500 text-sm mt-2"
+            >
+              <p>Generating response...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Knowledge Base -->
+        <div id="kb-tab" class="tab-content">
+          <div class="kb-management">
+            <div id="kb-list" class="max-h-64 overflow-y-auto">
+              <!-- KB items will be injected here by JS -->
+            </div>
+            <form id="add-doc-form" class="mt-6">
+              <h4 class="text-xl font-bold text-gray-800 mb-3">
+                Add Secret Document
+              </h4>
+              <label
+                for="doc-content"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Content (The "Secret"):</label
+              >
+              <textarea
+                id="doc-content"
+                rows="3"
+                placeholder="e.g., My personal PIN is 1234."
+              ></textarea>
+
+              <label
+                for="doc-keywords"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Keywords (for retrieval):</label
+              >
+              <input
+                id="doc-keywords"
+                type="text"
+                placeholder="e.g., pin, secret, number"
+              />
+
+              <button id="add-doc-button" type="button">
+                Add Document to Knowledge Base
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Tab 3: Demo Scenarios -->
+        <div id="demo-tab" class="tab-content">
+          <div class="demo-scenario">
+            <h4>Case Study 1: The Secret PIN</h4>
+            <p class="text-base text-gray-700">
+              This demo proves that the LLM is answering *only* from the
+              knowledge base. We will guide you through adding a "secret" (that
+              the LLM cannot possibly know) and then asking the LLM for it.
+            </p>
+
+            <div id="demo-log" class="mt-6">
+              <!-- Demo steps will be added here dynamically -->
+            </div>
+
+            <button
+              id="run-demo-reset"
+              class="demo-button bg-gray-600 hover:bg-gray-700 mt-4"
+            >
+              Reset Demo
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 4: RAG Workflow -->
+        <div id="workflow-tab" class="tab-content">
+          <div id="workflow-content" class="workflow-container">
+            <p class="text-gray-500 italic p-6">
+              The workflow will appear here after you ask a question and RAG-Bot
+              generates a response...
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast-notification"></div>
+
+    <script>
+      // --- 0. HELPER FUNCTIONS ---
+      const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+      // Helper function for typing animation
+      async function typeText(element, text, speed = 50) {
+        element.value = "";
+        for (let char of text) {
+          element.value += char;
+          await sleep(speed);
+        }
+      }
+
+      // --- 1. SIMULATED KNOWLEDGE BASE (Vector Store) ---
+      let KNOWLEDGE_BASE_DEFAULT = [
+        {
+          id: "doc1",
+          content:
+            "LoRaWAN is a Low Power, Wide Area (LPWA) networking protocol designed for wireless, battery-operated 'things' in the Internet of Things (IoT). Its data rate ranges from 0.3 kbps to 27 kbps. This protocol is ideal for smart city applications like remote metering.",
+          keywords: ["lorawan", "lora", "protocol", "iot", "sensors", "data"],
+        },
+        {
+          id: "doc2",
+          content:
+            "Edge computing in IoT involves processing data locally on an edge device, near the source of data generation. This reduces latency and bandwidth usage compared to sending data to a centralized cloud. Benefits include real-time decision-making and improved security for smart city infrastructure.",
+          keywords: [
+            "edge",
+            "computing",
+            "iot",
+            "latency",
+            "security",
+            "benefits",
+          ],
+        },
+      ];
+      let KNOWLEDGE_BASE = [...KNOWLEDGE_BASE_DEFAULT];
+      let DEMO_IN_PROGRESS = false;
+
+      // --- 2. SIMULATED RETRIEVER (Embedding Model) ---
+      function retrieveContext(query) {
+        if (KNOWLEDGE_BASE.length === 0) {
+          return null; // KB is empty
+        }
+
+        const queryWords = query.toLowerCase().split(/\s+/);
+        let bestMatch = { score: 0, doc: null };
+
+        KNOWLEDGE_BASE.forEach((doc) => {
+          let score = 0;
+          doc.keywords.forEach((keyword) => {
+            if (queryWords.includes(keyword)) {
+              score++;
+            }
+          });
+
+          if (score > bestMatch.score) {
+            bestMatch.score = score;
+            bestMatch.doc = doc;
+          }
+        });
+
+        // If score is 0, no match was found
+        return bestMatch.score > 0 ? bestMatch.doc : null;
+      }
+
+      // --- 3. GENERATOR (LLM) ---
+      // Store API key in a variable
+      let API_KEY = "";
+
+      async function callGeminiAPI(fullPrompt) {
+        if (!API_KEY) {
+          return "Error: API Key is missing. Please click the 🔑 icon to enter your API Key.";
+        }
+
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+
+        const payload = {
+          contents: [{ parts: [{ text: fullPrompt }] }],
+        };
+
+        try {
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          // *** THIS IS THE FIX ***
+          if (!response.ok) {
+            // Removed the extra dot
+            const errorBody = await response.json(); // Try to parse error body
+            console.error("API Error Response:", errorBody);
+            // Check for specific API key error
+            if (
+              errorBody.error &&
+              errorBody.error.message.includes("API key not valid")
+            ) {
+              return "Error: API Key is not valid. Please check your key and try again.";
+            }
+            throw new Error(
+              `API Error: ${response.status} ${response.statusText}`
+            );
+          }
+          // *** END OF FIX ***
+
+          const result = await response.json();
+          const candidate = result.candidates?.[0];
+
+          if (candidate && candidate.content?.parts?.[0]?.text) {
+            return candidate.content.parts[0].text;
+          } else {
+            if (
+              result.candidates &&
+              result.candidates[0].finishReason !== "STOP"
+            ) {
+              return `Error: Response was blocked. Finish Reason: ${result.candidates[0].finishReason}`;
+            }
+            return "Error: No valid response from the model.";
+          }
+        } catch (error) {
+          console.error("Full Gemini API call failed:", error);
+          return "Error: Could not connect to the generative AI model. (See console for details)";
+        }
+      }
+
+      // --- 4. RAG-BOT PIPELINE (Putting it all together) ---
+      async function runRAGPipeline(query) {
+        // 1. Retrieve
+        showRetrievalStatus(true);
+        const contextDoc = retrieveContext(query);
+
+        // Handle no context found
+        if (!contextDoc) {
+          showLoading(false);
+          showRetrievalStatus(false);
+          let errorMsg =
+            KNOWLEDGE_BASE.length === 0
+              ? "My knowledge base is empty. Please add a document in the 'Knowledge Base' tab first."
+              : "I couldn't find any relevant documents in my knowledge base for that query. Please check your keywords or add a new document.";
+          addMessageToChat(errorMsg, "bot", false, null);
+
+          if (DEMO_IN_PROGRESS) {
+            updateDemoLog(
+              2,
+              "Failed! No document was found. Did you add the document in Step 1?"
+            );
+            DEMO_IN_PROGRESS = false;
+          }
+          return { success: false };
+        }
+
+        showRetrievalStatus(true, contextDoc);
+
+        // 2. Augment
+        const fullPrompt = `
+You are RAG-Bot, an AI assistant.
+Your task is to be a helpful expert.
+You MUST answer the user's query by **synthesizing a clear and helpful explanation** based *only* on the provided [Context].
+**Do not just repeat the context or the query.**
+**Do not be lazy.** Provide a full, high-quality answer.
+Do not use any prior knowledge.
+If the answer is not in the context, state: 'Based on the provided context, I do not have enough information to answer this question.'
+
+---
+[Context]
+Source Document ID: ${contextDoc.id}
+Content: "${contextDoc.content}"
+
+[Query]
+${query}
+
+[Helpful Answer (Synthesized from context)]:
+`;
+
+        // 3. Generate
+        showLoading(true);
+        const responseText = await callGeminiAPI(fullPrompt);
+        showLoading(false);
+        showRetrievalStatus(false);
+
+        // 4. Display response
+        addMessageToChat(responseText, "bot", false, null); // Don't pass workflowData here
+
+        // 5. Add citation
+        const citationText = `Source: [Retrieved from Document: ${contextDoc.id}]`;
+        addMessageToChat(citationText, "bot", true, null);
+
+        // 6. Update Workflow Tab
+        const workflowData = {
+          query: query,
+          retrievedDoc: contextDoc,
+          finalPrompt: fullPrompt,
+          response: responseText,
+        };
+        updateWorkflowTab(workflowData);
+
+        if (DEMO_IN_PROGRESS) {
+          updateDemoLog(3, "Step 2: Complete! The model gave an answer.");
+        }
+        return { success: true };
+      }
+
+      // --- UI Helper Functions ---
+      const chatArea = document.getElementById("chat-area");
+      const userInput = document.getElementById("user-input");
+      const sendButton = document.getElementById("send-button");
+      const loadingIndicator = document.getElementById("loading-indicator");
+      const retrievalStatus = document.getElementById("retrieval-status");
+      const kbList = document.getElementById("kb-list");
+      const addDocButton = document.getElementById("add-doc-button");
+      const docContentInput = document.getElementById("doc-content");
+      const docKeywordsInput = document.getElementById("doc-keywords");
+      const workflowContent = document.getElementById("workflow-content");
+      const workflowDot = document.getElementById("workflow-dot");
+      const apiKeyIcon = document.getElementById("api-key-icon");
+      const apiKeyRow = document.getElementById("api-key-row");
+      const apiKeyInput = document.getElementById("api-key-input");
+      const apiKeySaveButton = document.getElementById("api-key-save-button");
+      const toast = document.getElementById("toast-notification");
+
+      // Demo step elements
+      const demoLog = document.getElementById("demo-log");
+      const runDemoResetButton = document.getElementById("run-demo-reset");
+
+      // --- Tab Switching Function ---
+      function showTab(tabName) {
+        // Hide all tab content
+        document.querySelectorAll(".tab-content").forEach((tab) => {
+          tab.classList.remove("active");
+        });
+        // Deactivate all tab buttons
+        document.querySelectorAll(".tab-button").forEach((button) => {
+          button.classList.remove("active");
+        });
+
+        // Show the selected tab content
+        document.getElementById(`${tabName}-tab`).classList.add("active");
+        // Activate the selected tab button
+        document
+          .querySelector(`.tab-button[onclick="showTab('${tabName}')"]`)
+          .classList.add("active");
+
+        // If switching to workflow, hide the notification dot
+        if (tabName === "workflow") {
+          workflowDot.classList.add("hidden");
+        }
+      }
+
+      // --- Update Workflow Tab Function ---
+      function updateWorkflowTab(data) {
+        workflowContent.innerHTML = `
+                <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p class="font-semibold text-green-800">Success! RAG-Bot generated a response using the retrieved context.</p>
+                </div>
+                
+                <div class="workflow-box">
+                    <div class="workflow-header">
+                        <h4>Step 1: Retrieve</h4>
+                    </div>
+                    <div class="workflow-body">
+                        <p class="font-sans mb-2">The user's query ("${
+                          data.query
+                        }") was converted to keywords and matched against the Knowledge Base. The best match was:</p>
+                        <pre><strong>ID:</strong> ${
+                          data.retrievedDoc.id
+                        }\n<strong>Content:</strong> "${
+          data.retrievedDoc.content
+        }"</pre>
+                    </div>
+                </div>
+                
+                <div class="workflow-box">
+                    <div class="workflow-header">
+                        <h4>Step 2: Augment</h4>
+                    </div>
+                    <div class="workflow-body">
+                        <p class="font-sans mb-2">This retrieved context was combined with the query into a final, augmented prompt. This is the *only* information the LLM was allowed to see:</p>
+                        <pre>${data.finalPrompt
+                          .trim()
+                          .replace(/</g, "&lt;")
+                          .replace(/>/g, "&gt;")}</pre>
+Good, but the demo is stuck on Step 1, even after Add Document to Knowledge Base button has been clicked
+                    </div>
+                </div>
+
+                <div class="workflow-box">
+                    <div class="workflow-header">
+                        <h4>Step 3: Generate</h4>
+                    </div>
+                    <div class="workflow-body">
+                        <p class="font-sans mb-2">This complete prompt was sent to the generative AI. The model synthesized the context and returned the final answer:</p>
+                        <pre>${data.response
+                          .trim()
+                          .replace(/</g, "&lt;")
+                          .replace(/>/g, "&gt;")}</pre>
+                    </div>
+                </div>
+            `;
+        // Show the notification dot
+        workflowDot.classList.remove("hidden");
+
+        if (DEMO_IN_PROGRESS) {
+          updateDemoLog(
+            4,
+            "Step 3: Complete! Check the RAG Workflow tab to see how it worked."
+          );
+          DEMO_IN_PROGRESS = false;
+        }
+      }
+
+      function addMessageToChat(text, sender, isCitation = false) {
+        const bubble = document.createElement("div");
+        bubble.classList.add(
+          "flex",
+          sender === "user" ? "justify-end" : "justify-start"
+        );
+
+        let bubbleClass =
+          sender === "user" ? "chat-bubble-user" : "chat-bubble-bot";
+        if (isCitation) {
+          bubbleClass =
+            "bg-gray-100 text-gray-500 text-xs italic border border-gray-200";
+        }
+
+        let bubbleHTML = `
+                <div class="${bubbleClass} p-3 rounded-lg max-w-lg shadow">
+                    ${
+                      !isCitation && sender === "bot"
+                        ? '<p class="font-semibold">RAG-Bot</p>'
+                        : ""
+                    }
+                    <p>${text.replace(/\n/g, "<br>")}</p>
+                </div>
+            `;
+
+        bubble.innerHTML = bubbleHTML;
+        chatArea.appendChild(bubble);
+        chatArea.scrollTop = chatArea.scrollHeight;
+      }
+
+      function showLoading(isLoading) {
+        if (isLoading) {
+          loadingIndicator.classList.remove("hidden");
+          sendButton.disabled = true;
+          sendButton.classList.add("opacity-50");
+        } else {
+          loadingIndicator.classList.add("hidden");
+          sendButton.disabled = false;
+          sendButton.classList.remove("opacity-50");
+        }
+      }
+
+      function showRetrievalStatus(isRetrieving, doc = null) {
+        if (isRetrieving) {
+          retrievalStatus.classList.remove("hidden");
+          if (doc) {
+            retrievalStatus.innerHTML = `<p><span class="font-bold">Context Retrieved:</span> Found relevant info in Document ID: ${doc.id}. Augmenting prompt...</p>`;
+          } else {
+            retrievalStatus.innerHTML = `<p><span class="font-bold">Retrieving context...</span></p>`;
+          }
+        } else {
+          retrievalStatus.classList.add("hidden");
+        }
+      }
+
+      async function handleSend() {
+        const query = userInput.value.trim();
+        if (query) {
+          addMessageToChat(query, "user");
+          userInput.value = "";
+          const result = await runRAGPipeline(query);
+          return result; // Return success status
+        }
+        return { success: false };
+      }
+
+      // --- KB MANAGEMENT FUNCTIONS ---
+      function renderKB() {
+        kbList.innerHTML = "";
+        if (KNOWLEDGE_BASE.length === 0) {
+          kbList.innerHTML =
+            '<p class="text-gray-500 text-sm italic text-center p-4">Your knowledge base is empty. Add a secret document below!</p>';
+          return;
+        }
+
+        KNOWLEDGE_BASE.forEach((doc) => {
+          const item = document.createElement("div");
+          item.className = "kb-item";
+          item.innerHTML = `
+                    <p><strong>ID:</strong> ${doc.id}</p>
+                    <p><strong>Content:</strong> ${doc.content.substring(
+                      0,
+                      100
+                    )}...</p>
+                    <p><strong>Keywords:</strong> ${doc.keywords.join(", ")}</p>
+                `;
+          kbList.appendChild(item);
+        });
+      }
+
+      function addDocumentToKB(content, keywordsRaw) {
+        const docContent = content || docContentInput.value.trim();
+        const docKeywords = keywordsRaw || docKeywordsInput.value.trim();
+
+        if (!docContent || !docKeywords) {
+          showToast("Please fill out both content and keywords.", "error");
+          return null;
+        }
+
+        const keywords = docKeywords
+          .split(",")
+          .map((k) => k.trim().toLowerCase())
+          .filter((k) => k);
+
+        if (keywords.length === 0) {
+          showToast("Please provide at least one valid keyword.", "error");
+          return null;
+        }
+
+        const newDoc = {
+          id: `doc${KNOWLEDGE_BASE.length + 1}`,
+          content: docContent,
+          keywords: keywords,
+        };
+
+        KNOWLEDGE_BASE.push(newDoc);
+        renderKB();
+
+        // Clear input fields only if function was called by button click (not demo)
+        if (!content) {
+          docContentInput.value = "";
+          docKeywordsInput.value = "";
+        }
+
+        return newDoc;
+      }
+
+      // *** THIS IS THE FIX ***
+      async function handleAddDocClick() {
+        // Capture the value *before* it gets cleared
+        const content = docContentInput.value.trim();
+
+        const newDoc = addDocumentToKB(); // This function *might* clear the inputs
+
+        if (newDoc) {
+          // Check against the captured value
+          if (DEMO_IN_PROGRESS && content === "My personal PIN is 1234.") {
+            showToast("Secret document added!", "success");
+            await sleep(1000); // Wait 1 second
+            showTab("demo"); // Switch back to demo tab
+            updateDemoLog(2, "Step 1: Complete! Secret document added.");
+          } else {
+            // Normal manual add
+            showToast("Document Added!", "success");
+            // Stay on KB tab so user can see their new doc
+          }
+        }
+      }
+      // *** END OF FIX ***
+
+      // --- API Key UI Functions ---
+      apiKeyIcon.addEventListener("click", () => {
+        apiKeyRow.classList.toggle("active");
+      });
+
+      apiKeySaveButton.addEventListener("click", () => {
+        const key = apiKeyInput.value.trim();
+        if (key) {
+          API_KEY = key;
+          apiKeyRow.classList.remove("active");
+          showToast("API Key Saved!", "success");
+        } else {
+          showToast("Please enter a key.", "error");
+        }
+      });
+
+      function showToast(message, type) {
+        toast.textContent = message;
+        // Reset all type classes
+        toast.classList.remove("bg-green-600", "bg-red-600");
+
+        toast.classList.add(type === "success" ? "bg-green-600" : "bg-red-600");
+        toast.classList.add("show");
+
+        setTimeout(() => {
+          toast.classList.remove("show");
+        }, 3000);
+      }
+
+      // --- Demo Scenario Functions ---
+      const demoLogSteps = [
+        {
+          id: 1,
+          title: "Step 1: Add the Secret",
+          description:
+            "Click the button to automatically add a secret document to the Knowledge Base.",
+          actionText: "Start Demo: Add Document",
+          action: async () => {
+            // *** FIX 2: API Key Check ***
+            if (!API_KEY) {
+              showToast("Please add your API Key first!", "error");
+              showTab("chat");
+              apiKeyRow.classList.add("active");
+              return;
+            }
+
+            DEMO_IN_PROGRESS = true;
+            // *** FIX 1: Keep Reset Button Enabled ***
+            // runDemoResetButton.disabled = true;
+
+            // Switch to KB tab and type
+            showTab("kb");
+            await sleep(300);
+            await typeText(docContentInput, "My personal PIN is 1234.");
+            await typeText(docKeywordsInput, "pin, secret, number");
+
+            // Update demo log
+            updateDemoLog(
+              1,
+              "The fields are filled. Now, please click the green 'Add Document to Knowledge Base' button yourself."
+            );
+          },
+        },
+        {
+          id: 2,
+          title: "Step 2: Ask the Question",
+          description:
+            "Now we'll go to the Chat and ask the 'impossible' question. The bot can only answer this if it 'read' the document we just added.",
+          actionText: "Go to Chat & Ask",
+          action: async () => {
+            // Switch to chat tab
+            showTab("chat");
+            await sleep(300);
+
+            // "Type" out the question
+            const query = "What is my PIN ?"; // Fixed query
+            await typeText(userInput, query, 60);
+
+            // Update demo log
+            updateDemoLog(
+              2,
+              "The question is typed. Now, please press the 'Send' button yourself."
+            );
+          },
+        },
+        {
+          id: 3,
+          title: "Step 3: See the Workflow",
+          description:
+            "The pipeline ran! The bot retrieved the context and generated an answer.",
+          actionText: "See RAG Workflow",
+          action: async () => {
+            showTab("workflow");
+            updateDemoLog(
+              4,
+              "Step 3: Complete! You can see how the answer was generated."
+            );
+          },
+        },
+        {
+          id: 4,
+          title: "Step 4: Demo Complete",
+          description: "You can now ask your own questions or reset the demo.",
+          actionText: "",
+          action: null,
+        },
+      ];
+
+      function updateDemoLog(stepId, customMessage = "") {
+        demoLog.innerHTML = "<ul></ul>"; // Clear log
+        const ul = demoLog.querySelector("ul");
+
+        for (let i = 0; i < demoLogSteps.length; i++) {
+          const step = demoLogSteps[i];
+          const li = document.createElement("li");
+
+          let status = "pending";
+          if (step.id < stepId) {
+            status = "completed";
+          } else if (step.id === stepId) {
+            status = "active";
+          }
+
+          li.classList.add(status);
+
+          let html = `<h5>${step.title}</h5>`;
+          if (status === "completed") {
+            // For completed steps, just show the title
+            html += `<p>Completed.</p>`;
+          } else if (status === "active") {
+            html += `<p>${customMessage || step.description}</p>`;
+            if (step.action) {
+              const button = document.createElement("button");
+              button.className = "demo-button";
+              button.textContent = step.actionText;
+              button.onclick = step.action;
+              li.appendChild(
+                document.createRange().createContextualFragment(html)
+              );
+              li.appendChild(button);
+            } else {
+              li.innerHTML = html;
+            }
+          } else {
+            li.innerHTML = html;
+          }
+
+          if (!li.querySelector("button")) {
+            li.innerHTML = html;
+          }
+
+          ul.appendChild(li);
+        }
+
+        // Special case for step 3 completed message
+        if (stepId === 3) {
+          const li = ul.querySelector("li.active");
+          if (li) li.querySelector("p").textContent = customMessage;
+        }
+        // Special case for step 4 completed message
+        if (stepId === 4) {
+          const li = ul.querySelector("li.active");
+          if (li) li.querySelector("p").textContent = customMessage;
+        }
+      }
+
+      runDemoResetButton.addEventListener("click", () => {
+        KNOWLEDGE_BASE = [...KNOWLEDGE_BASE_DEFAULT];
+        renderKB();
+        DEMO_IN_PROGRESS = false;
+        // runDemoResetButton.disabled = false; // No longer needed
+        updateDemoLog(1);
+        showTab("demo");
+        addMessageToChat(
+          "Demo has been reset. Knowledge base restored to defaults.",
+          "bot",
+          true,
+          null
+        );
+        docContentInput.value = "";
+        docKeywordsInput.value = "";
+        userInput.value = "";
+      });
+
+      // Initial setup
+      sendButton.addEventListener("click", handleSend);
+      userInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          handleSend();
+        }
+      });
+      addDocButton.addEventListener("click", handleAddDocClick);
+
+      renderKB(); // Render the initial (pre-populated) KB on load
+      updateDemoLog(1); // Initialize demo log
+    </script>
+  </body>
+</html>
